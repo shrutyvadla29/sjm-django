@@ -70,6 +70,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "sjmedspace.wsgi.application"
 
+AUTHENTICATION_BACKENDS = [
+    'core.authentication.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases

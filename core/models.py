@@ -4,7 +4,9 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 
 class User(models.Model):
-    pass
+    
+    def __str__(self):
+        return self
 
 
 class Publication(models.Model):
@@ -21,19 +23,22 @@ class Publication(models.Model):
             self.slug = slugify(self.title)
         super().save(*args, **kwargs)
 
+    def __str__(self):
+        return self.title
+
 class Comment(models.Model):
-    user_id = models.ForeignKey(User, related_name="commented_user", on_delete=models.CASCADE)
-    publication_id = models.ForeignKey(Publication,related_name="publications_commented", on_delete=models.CASCADE)
+    user_id = models.IntegerField()
+    publication_id = models.IntegerField()
     comment_value = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Likes(models.Model):
-    user_id = models.ForeignKey(User, related_name="liked_user", on_delete=models.CASCADE)
-    publication_id=models.ForeignKey(Publication, related_name="publications_liked",on_delete=models.CASCADE)
+    user_id = models.IntegerField()
+    publication_id=models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Saved(models.Model):
-    user_id = models.ForeignKey(User, related_name="saved_user", on_delete=models.CASCADE)
-    publication_id=models.ForeignKey(Publication, related_name="publications_saved", on_delete=models.CASCADE)
+    user_id = models.IntegerField()
+    publication_id=models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -5,8 +5,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login, authenticate,logout
-from .models import Publication, Comment
+from django.contrib.auth import login, authenticate,logout, get_user_model
+from .models import Publication, Comment, Likes, Saved
 
 
 # Create your views here.
@@ -19,30 +19,23 @@ def homepage(request):
 def aboutpage(request):
     return HttpResponse("Hello World")
 
+
 def login_page(request):
     if request.method == "POST":
         email = request.POST.get("email")
         password = request.POST.get("password")
-
-        try:
-            user = User.objects.get(email=email)  # Get user by email
-            user = authenticate(request, username=user.username, password=password)  # Authenticate with username
-        except User.DoesNotExist:
-            user = None  # If email is not found, authentication fails
-
-        print(email, password)
+        print(email,password)
+        user = authenticate(request, username=email, password=password)
         print(user)
 
-        if user is not None:
+        if user:
             login(request, user)
             messages.success(request, "Login successful!")
-            return redirect("publications")  
+            return redirect("publications")
         else:
             messages.error(request, "Invalid email or password.")
 
     return render(request, "signin.html")
-
-
 def signup_page(request):
     if request.method == "POST":
         firstname = request.POST.get("firstname")
@@ -77,33 +70,65 @@ def signup_page(request):
 
     return render(request, "signup.html")
 
-
-
 def publication_detail(request, slug):
     publication = get_object_or_404(Publication, slug=slug)
-    comments =  Comment.objects.filter(publication_id=publication).order_by("-created_at")
+    
+    # Get the user ID if authenticated
+    user_id = request.user.id if request.user.is_authenticated else None
 
+    # Check if the user has liked or saved the publication
+    liked = Likes.objects.filter(user_id=user_id, publication_id=publication.id).exists() if user_id else False
+    saved = Saved.objects.filter(user_id=user_id, publication_id=publication.id).exists() if user_id else False
+    
+    # Count total likes
+    like_count = Likes.objects.filter(publication_id=publication.id).count()
+    
+    # Get all comments
+    comments = Comment.objects.filter(publication_id=publication.id).order_by("-created_at")
+
+    # Handle new comment submission
     if request.method == "POST":
         if not request.user.is_authenticated:
             messages.error(request, "You need to log in to comment.")
             return redirect("login_page")
-        
-        comment_value = request.POST.get("comment_value")
+
+        comment_value = request.POST.get("comment_value", "").strip()  # Ensure input isn't just whitespace
+
         if comment_value:
             Comment.objects.create(
-                user=request.user,
-                publication=publication,
+                user_id=request.user.id,  # Save user ID directly
+                publication_id=publication.id,
                 comment_value=comment_value,
             )
             messages.success(request, "Comment added successfully!")
-            return redirect("publication_detail", publication_id=publication.id)
         else:
             messages.error(request, "Comment cannot be empty.")
 
-    return render(request, "publication.html", {
+        return redirect("publication_detail", slug=publication.slug)  # Avoid duplicate form resubmission
+
+    context = {
         "publication": publication,
         "comments": comments,
-    })
+        "liked": liked,
+        "saved": saved,
+        "like_count": like_count,
+    }
+
+    return render(request, "publication.html", context)
+
+@login_required
+def like_publication(request, publication_id):
+    publication = get_object_or_404(Publication, id=publication_id)
+    user_id = request.user.id  
+
+    if Likes.objects.filter(user_id=user_id, publication_id=publication.id).exists():
+        Likes.objects.filter(user_id=user_id, publication_id=publication.id).delete()
+        messages.success(request, "You unliked this publication.")
+    else:
+        Likes.objects.create(user_id=user_id, publication_id=publication.id)
+        messages.success(request, "You liked this publication.")
+
+    return redirect("publication_detail", slug=publication.slug)
 
 
 
@@ -123,3 +148,39 @@ def logout_view(request):
     logout(request)
     messages.success(request, "Logged out successfully!")
     return redirect("homepage")
+
+
+@login_required
+def like_publication(request, publication_id):
+    publication = get_object_or_404(Publication, id=publication_id)
+    user_id = request.user.id  # Get the logged-in user’s ID
+
+    # Check if the user already liked the publication
+    like_exists = Likes.objects.filter(user_id=user_id, publication_id=publication.id).exists()
+
+    if like_exists:
+        Likes.objects.filter(user_id=user_id, publication_id=publication.id).delete()
+        messages.success(request, "You unliked this publication.")
+    else:
+        Likes.objects.create(user_id=user_id, publication_id=publication.id)
+        messages.success(request, "You liked this publication.")
+
+    return redirect("publication_detail", slug=publication.slug)
+
+
+@login_required
+def save_publication(request, publication_id):
+    publication = get_object_or_404(Publication, id=publication_id)
+    user_id = request.user.id  
+
+    # Check if the user already saved the publication
+    save_exists = Saved.objects.filter(user_id=user_id, publication_id=publication.id).exists()
+
+    if save_exists:
+        Saved.objects.filter(user_id=user_id, publication_id=publication.id).delete()
+        messages.success(request, "You removed this publication from saved.")
+    else:
+        Saved.objects.create(user_id=user_id, publication_id=publication.id)
+        messages.success(request, "You saved this publication.")
+
+    return redirect("publication_detail", slug=publication.slug)

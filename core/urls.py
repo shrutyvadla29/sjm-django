@@ -9,4 +9,6 @@ urlpatterns=[
     path("publications/", view=views.publications_page, name="publications"),
     path("publication/<slug:slug>/", views.publication_detail, name="publication_detail"),
     path("logout/", view=views.logout_view, name="logout"),
+    path('publication/<int:publication_id>/like/', views.like_publication, name='like_publication'),
+    path('publication/<int:publication_id>/save/', views.save_publication, name='save_publication'),
 ]
